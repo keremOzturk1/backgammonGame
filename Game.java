@@ -1,0 +1,100 @@
+class Game {
+
+    Board board;
+    Player player1;
+    Player player2;
+    Player currentPlayer;
+    Dice dice;
+    GameState state;
+    MoveValidator moveValidator;
+
+    public Game() {
+        board = new Board();
+        player1 = new Player("Player 1", 1);
+        player2 = new Player("Player 2", -1);
+        currentPlayer = player1;
+        dice = new Dice();
+        state = new GameState();
+        moveValidator = new MoveValidator();
+    }
+
+    public void startGame() {
+        board.initialize(player1, player2);
+        System.out.println("Backgammon game started.");
+        System.out.println(currentPlayer.getName() + " starts the game.");
+        board.printBoard();
+    }
+
+    public void playTurn() {
+        System.out.println("\n" + currentPlayer.getName() + "'s turn.");
+        dice.roll();
+        System.out.println("Dice: " + dice.getFirstDie() + " - " + dice.getSecondDie());
+
+        java.util.ArrayList<Move> validMoves = moveValidator.getAllValidMoves(board, currentPlayer, dice);
+
+        if (validMoves.isEmpty()) {
+            System.out.println("No valid moves available.");
+            switchPlayer();
+            return;
+        }
+
+        printValidMoves(validMoves);
+        Move selectedMove = askPlayerToChooseMove(validMoves);
+        board.movePiece(selectedMove.getFrom(), selectedMove.getTo(), currentPlayer);
+
+        System.out.println("Move played: From " + selectedMove.getFrom() + " to " + selectedMove.getTo());
+        board.printBoard();
+
+        switchPlayer();
+    }
+
+    private void printValidMoves(java.util.ArrayList<Move> validMoves) {
+        System.out.println("Valid moves:");
+
+        for (int i = 0; i < validMoves.size(); i++) {
+            Move move = validMoves.get(i);
+            System.out.println((i + 1) + ") From " + move.getFrom() + " to " + move.getTo() +
+                    (move.isHit() ? " (hit)" : ""));
+        }
+    }
+
+    private Move askPlayerToChooseMove(java.util.ArrayList<Move> validMoves) {
+        java.util.Scanner scanner = new java.util.Scanner(System.in);
+        int choice = -1;
+
+        while (choice < 1 || choice > validMoves.size()) {
+            System.out.print("Choose a move number: ");
+
+            if (scanner.hasNextInt()) {
+                choice = scanner.nextInt();
+            } else {
+                scanner.next();
+                System.out.println("Please enter a valid number.");
+            }
+        }
+
+        return validMoves.get(choice - 1);
+    }
+
+    public void switchPlayer() {
+        if (currentPlayer == player1) {
+            currentPlayer = player2;
+        } else {
+            currentPlayer = player1;
+        }
+    }
+
+    public boolean isGameOver() {
+        return player1.getBorneOff() == 15 || player2.getBorneOff() == 15;
+    }
+
+    public Player getWinner() {
+        if (player1.getBorneOff() == 15) {
+            return player1;
+        }
+        if (player2.getBorneOff() == 15) {
+            return player2;
+        }
+        return null;
+    }
+}
