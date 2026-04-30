@@ -30,20 +30,28 @@ class Game {
         dice.roll();
         System.out.println("Dice: " + dice.getFirstDie() + " - " + dice.getSecondDie());
 
-        java.util.ArrayList<Move> validMoves = moveValidator.getAllValidMoves(board, currentPlayer, dice);
+        int[] diceMoves = dice.getMoves();
 
-        if (validMoves.isEmpty()) {
-            System.out.println("No valid moves available.");
-            switchPlayer();
-            return;
+        for (int i = 0; i < diceMoves.length; i++) {
+            int currentDiceValue = diceMoves[i];
+            System.out.println("\nCurrent dice value: " + currentDiceValue);
+
+            java.util.ArrayList<Move> validMoves =
+                    moveValidator.getValidMovesForDice(board, currentPlayer, currentDiceValue);
+
+            if (validMoves.isEmpty()) {
+                System.out.println("No valid moves available for dice value " + currentDiceValue + ".");
+                continue;
+            }
+
+            printValidMoves(validMoves);
+
+            Move selectedMove = askPlayerToChooseMove(validMoves);
+            board.movePiece(selectedMove.getFrom(), selectedMove.getTo(), currentPlayer);
+
+            System.out.println("Move played: From " + selectedMove.getFrom() + " to " + selectedMove.getTo());
+            board.printBoard();
         }
-
-        printValidMoves(validMoves);
-        Move selectedMove = askPlayerToChooseMove(validMoves);
-        board.movePiece(selectedMove.getFrom(), selectedMove.getTo(), currentPlayer);
-
-        System.out.println("Move played: From " + selectedMove.getFrom() + " to " + selectedMove.getTo());
-        board.printBoard();
 
         switchPlayer();
     }
