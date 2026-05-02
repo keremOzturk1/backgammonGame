@@ -50,10 +50,14 @@ public class Board {
     }
 
     public void movePiece(int from, int to, Player player) {
-        Point source = points[from];
         Point destination = points[to];
 
-        source.removePiece();
+        if (from == -1) {
+            player.removeFromBar();
+        } else {
+            Point source = points[from];
+            source.removePiece();
+        }
 
         // Handle hit
         if (destination.canBeHitBy(player)) {
@@ -65,7 +69,7 @@ public class Board {
         destination.addPiece(player);
     }
 
-    // Debug print (very useful)
+    // Debug print
     public void printBoard() {
         for (int i = 0; i < 24; i++) {
             String ownerName = "empty";
@@ -74,7 +78,7 @@ public class Board {
                 ownerName = points[i].owner.getName();
             }
 
-            System.out.println("Point " + i + ": " + points[i].count + " pieces, owner: " + ownerName);
+            System.out.println("Point " + (i + 1) + ": " + points[i].count + " pieces, owner: " + ownerName);
         }
     }
 }

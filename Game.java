@@ -1,4 +1,4 @@
-class Game {
+public class Game {
 
     Board board;
     Player player1;
@@ -49,7 +49,15 @@ class Game {
             Move selectedMove = askPlayerToChooseMove(validMoves);
             board.movePiece(selectedMove.getFrom(), selectedMove.getTo(), currentPlayer);
 
-            System.out.println("Move played: From " + selectedMove.getFrom() + " to " + selectedMove.getTo());
+            String selectedFromText;
+
+            if (selectedMove.getFrom() == -1) {
+                selectedFromText = "BAR";
+            } else {
+                selectedFromText = String.valueOf(selectedMove.getFrom() + 1);
+            }
+
+            System.out.println("Move played: From " + selectedFromText + " to " + (selectedMove.getTo() + 1));
             board.printBoard();
         }
 
@@ -61,7 +69,15 @@ class Game {
 
         for (int i = 0; i < validMoves.size(); i++) {
             Move move = validMoves.get(i);
-            System.out.println((i + 1) + ") From " + move.getFrom() + " to " + move.getTo() +
+            String fromText;
+
+            if (move.getFrom() == -1) {
+                fromText = "BAR";
+            } else {
+                fromText = String.valueOf(move.getFrom() + 1);
+            }
+
+            System.out.println((i + 1) + ") From " + fromText + " to " + (move.getTo() + 1) +
                     (move.isHit() ? " (hit)" : ""));
         }
     }

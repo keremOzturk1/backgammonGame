@@ -8,13 +8,40 @@ public class MoveValidator {
         int to = move.getTo();
         Player player = move.getPlayer();
 
-        // Check board bounds
-        if (from < 0 || from >= 24 || to < 0 || to >= 24) {
+        // Check destination bounds
+        if (to < 0 || to >= 24) {
+            return false;
+        }
+
+        Point destination = board.getPoint(to);
+
+        // If player has pieces on the bar, only bar entry moves are allowed
+        if (player.hasPiecesOnBar()) {
+            if (from != -1) {
+                return false;
+            }
+
+            int expectedEntryPoint;
+
+            if (player.getDirection() == 1) {
+                expectedEntryPoint = diceValue - 1;
+            } else {
+                expectedEntryPoint = 24 - diceValue;
+            }
+
+            if (to != expectedEntryPoint) {
+                return false;
+            }
+
+            return !destination.isBlockedFor(player);
+        }
+
+        // Normal moves must start from a valid board point
+        if (from < 0 || from >= 24) {
             return false;
         }
 
         Point source = board.getPoint(from);
-        Point destination = board.getPoint(to);
 
         // Source point must belong to the player
         if (source.isEmpty() || !source.isOwnedBy(player)) {
@@ -38,6 +65,30 @@ public class MoveValidator {
     // Generate all valid moves for one dice value
     public ArrayList<Move> getValidMovesForDice(Board board, Player player, int diceValue) {
         ArrayList<Move> validMoves = new ArrayList<>();
+
+        if (player.hasPiecesOnBar()) {
+            int entryPoint;
+
+            if (player.getDirection() == 1) {
+                entryPoint = diceValue - 1;
+            } else {
+                entryPoint = 24 - diceValue;
+            }
+
+            Move barMove = new Move(-1, entryPoint, player);
+
+            if (isValidMove(board, barMove, diceValue)) {
+                Point destination = board.getPoint(entryPoint);
+
+                if (destination.canBeHitBy(player)) {
+                    barMove.isHit = true;
+                }
+
+                validMoves.add(barMove);
+            }
+
+            return validMoves;
+        }
 
         for (int from = 0; from < 24; from++) {
             int to = from + (diceValue * player.getDirection());

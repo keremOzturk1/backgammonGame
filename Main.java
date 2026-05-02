@@ -9,7 +9,7 @@ import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 
-class Main {
+public class Main {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -32,8 +32,9 @@ class BackgammonGUI {
     private JLabel diceLabel;
     private JButton rollButton;
 
-    private int[] currentDiceMoves;
-    private int currentDiceIndex;
+    private ArrayList<Integer> remainingDiceMoves;
+    private boolean canSwitchDiceOrder;
+    private boolean isDoubleTurn;
 
     public BackgammonGUI() {
         game = new Game();
@@ -86,6 +87,10 @@ class BackgammonGUI {
 
         frame.add(rightPanel, BorderLayout.EAST);
 
+        remainingDiceMoves = new ArrayList<>();
+        canSwitchDiceOrder = false;
+        isDoubleTurn = false;
+
         updateBoardDisplay();
         updateInfo("Game started. Click Roll Dice to begin.");
     }
@@ -96,44 +101,67 @@ class BackgammonGUI {
 
     private void startTurn() {
         game.dice.roll();
-        currentDiceMoves = game.dice.getMoves();
-        currentDiceIndex = 0;
+        remainingDiceMoves = new ArrayList<>();
+
+        int[] diceMoves = game.dice.getMoves();
+        for (int i = 0; i < diceMoves.length; i++) {
+            remainingDiceMoves.add(diceMoves[i]);
+        }
+
+        isDoubleTurn = game.dice.isDouble();
+        canSwitchDiceOrder = !isDoubleTurn && remainingDiceMoves.size() == 2;
+
         rollButton.setEnabled(false);
         diceLabel.setText("Dice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie());
 
         updateInfo(game.currentPlayer.getName() + " rolled " +
                 game.dice.getFirstDie() + " - " + game.dice.getSecondDie());
 
-        showMovesForCurrentDice();
+        showMovesForNextDice();
     }
 
-    private void showMovesForCurrentDice() {
+    private void showMovesForNextDice() {
         movePanel.removeAll();
 
-        if (currentDiceIndex >= currentDiceMoves.length) {
+        if (remainingDiceMoves.isEmpty()) {
             endTurn();
             return;
         }
 
-        int diceValue = currentDiceMoves[currentDiceIndex];
+        int diceValue = remainingDiceMoves.get(0);
 
         ArrayList<Move> validMoves =
                 game.moveValidator.getValidMovesForDice(game.board, game.currentPlayer, diceValue);
 
+        String extraInfo;
+
+        if (isDoubleTurn) {
+            extraInfo = "\nDouble moves remaining: " + remainingDiceMoves.size();
+        } else if (canSwitchDiceOrder && remainingDiceMoves.size() == 2) {
+            extraInfo = "\nYou may switch dice order before your first move.";
+        } else {
+            extraInfo = "";
+        }
+
         updateInfo("Current player: " + game.currentPlayer.getName() +
                 "\nDice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie() +
-                "\nCurrent dice value: " + diceValue);
+                "\nCurrent dice value: " + diceValue + extraInfo);
 
         if (validMoves.isEmpty()) {
             JButton skipButton = new JButton("No valid moves for " + diceValue + " - Skip");
-            skipButton.addActionListener(e -> {
-                currentDiceIndex++;
-                showMovesForCurrentDice();
-            });
+            skipButton.addActionListener(e -> skipCurrentDice());
             movePanel.add(skipButton);
         } else {
             for (Move move : validMoves) {
-                String moveText = "From " + toDisplayPoint(move.getFrom()) +
+                String fromText;
+
+                if (move.getFrom() == -1) {
+                    fromText = "BAR";
+                } else {
+                    fromText = String.valueOf(toDisplayPoint(move.getFrom()));
+                }
+
+                String moveText = "From " + fromText +
                         " to " + toDisplayPoint(move.getTo());
 
                 if (move.isHit()) {
@@ -146,20 +174,55 @@ class BackgammonGUI {
             }
         }
 
+        if (canSwitchDiceOrder && remainingDiceMoves.size() == 2) {
+            JButton switchButton = new JButton("Switch dice order: use " + remainingDiceMoves.get(1) + " first instead");
+            switchButton.addActionListener(e -> switchDiceOrder());
+            movePanel.add(switchButton);
+        }
+
         movePanel.revalidate();
         movePanel.repaint();
     }
 
+    private void switchDiceOrder() {
+        int firstDice = remainingDiceMoves.get(0);
+        int secondDice = remainingDiceMoves.get(1);
+
+        remainingDiceMoves.set(0, secondDice);
+        remainingDiceMoves.set(1, firstDice);
+        // canSwitchDiceOrder = false;
+
+        showMovesForNextDice();
+    }
+
+    private void skipCurrentDice() {
+        if (!remainingDiceMoves.isEmpty()) {
+            remainingDiceMoves.remove(0);
+        }
+
+        canSwitchDiceOrder = false;
+        showMovesForNextDice();
+    }
+
     private void playMove(Move move) {
         game.board.movePiece(move.getFrom(), move.getTo(), game.currentPlayer);
-        currentDiceIndex++;
+
+        if (!remainingDiceMoves.isEmpty()) {
+            remainingDiceMoves.remove(0);
+        }
+
+        canSwitchDiceOrder = false;
 
         updateBoardDisplay();
-        showMovesForCurrentDice();
+        showMovesForNextDice();
     }
 
     private void endTurn() {
         game.switchPlayer();
+
+        remainingDiceMoves = new ArrayList<>();
+        canSwitchDiceOrder = false;
+        isDoubleTurn = false;
 
         rollButton.setEnabled(true);
         movePanel.removeAll();
