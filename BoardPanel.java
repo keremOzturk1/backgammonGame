@@ -8,12 +8,24 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class BoardPanel extends JPanel {
 
     private Board board;
     private Player player1;
     private Player player2;
+
+    private DiceView diceView;
+    private Runnable diceClickAction;
+    private Runnable reverseClickAction;
+    private int leftDieValue;
+    private int rightDieValue;
+    private int remainingMoveCount;
+    private boolean diceCanRoll;
+    private boolean diceCanReverse;
+    private boolean diceIsDouble;
 
     private final Color woodDark = new Color(92, 50, 30);
     private final Color woodMid = new Color(135, 79, 45);
@@ -31,6 +43,21 @@ public class BoardPanel extends JPanel {
         this.player2 = player2;
         setPreferredSize(new Dimension(900, 620));
         setBackground(woodDark);
+
+        diceView = new DiceView();
+        diceCanRoll = true;
+        diceCanReverse = false;
+        diceIsDouble = false;
+        leftDieValue = 0;
+        rightDieValue = 0;
+        remainingMoveCount = 0;
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                handleMouseClick(e.getX(), e.getY());
+            }
+        });
     }
 
     public void setGameData(Board board, Player player1, Player player2) {
@@ -38,6 +65,40 @@ public class BoardPanel extends JPanel {
         this.player1 = player1;
         this.player2 = player2;
         repaint();
+    }
+
+    public void setDiceData(int leftDieValue, int rightDieValue, boolean diceCanRoll,
+                            boolean diceCanReverse, boolean diceIsDouble, int remainingMoveCount) {
+        this.leftDieValue = leftDieValue;
+        this.rightDieValue = rightDieValue;
+        this.diceCanRoll = diceCanRoll;
+        this.diceCanReverse = diceCanReverse;
+        this.diceIsDouble = diceIsDouble;
+        this.remainingMoveCount = remainingMoveCount;
+        repaint();
+    }
+
+    public void setDiceClickAction(Runnable diceClickAction) {
+        this.diceClickAction = diceClickAction;
+    }
+
+    public void setReverseClickAction(Runnable reverseClickAction) {
+        this.reverseClickAction = reverseClickAction;
+    }
+
+    private void handleMouseClick(int x, int y) {
+        if (diceCanReverse && diceView.isReverseClicked(x, y)) {
+            if (reverseClickAction != null) {
+                reverseClickAction.run();
+            }
+            return;
+        }
+
+        if (diceCanRoll && diceView.isDiceAreaClicked(x, y)) {
+            if (diceClickAction != null) {
+                diceClickAction.run();
+            }
+        }
     }
 
     @Override
@@ -78,12 +139,16 @@ public class BoardPanel extends JPanel {
         g2.fillRect(rightX, innerY, rightHalfW, innerH);
 
         drawBar(g2, barX, innerY, barWidth, innerH);
-        drawPockets(g2, boardX + frameThickness, innerY, pocketWidth, innerH, boardX + boardW - frameThickness - pocketWidth);
+        drawPockets(g2, boardX + frameThickness, innerY, pocketWidth, innerH,
+                boardX + boardW - frameThickness - pocketWidth);
         drawHinges(g2, barX, boardY, barWidth, boardH);
 
         int pointHeight = innerH / 2 - 16;
         drawPoints(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW, pointHeight);
         drawCheckers(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW);
+        drawBarCheckers(g2, barX, innerY, barWidth, innerH);
+        drawBorneOffCheckers(g2, boardX + boardW - frameThickness - pocketWidth, innerY, pocketWidth, innerH);
+        drawDiceArea(g2, leftX, innerY, leftHalfW, innerH);
         drawPointNumbers(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW);
     }
 
@@ -129,17 +194,10 @@ public class BoardPanel extends JPanel {
         g2.setColor(new Color(102, 58, 36));
         g2.fillRect(x, y, w, h);
 
-        g2.setColor(new Color(48, 25, 16));
-        int slotH = 24;
-        int gap = 18;
-        int startY = y + 70;
-
-        for (int i = 0; i < 6; i++) {
-            int slotY = startY + i * (slotH + gap);
-            if (slotY + slotH < y + h - 25) {
-                g2.fillRoundRect(x + 9, slotY, w - 18, slotH, 8, 8);
-            }
-        }
+        g2.setColor(new Color(128, 78, 48));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawLine(x + 3, y, x + 3, y + h);
+        g2.drawLine(x + w - 4, y, x + w - 4, y + h);
     }
 
     private void drawHinges(Graphics2D g2, int barX, int boardY, int barWidth, int boardH) {
@@ -147,11 +205,11 @@ public class BoardPanel extends JPanel {
         int hingeH = 54;
         int hingeX = barX + 3;
         int centerY = boardY + boardH / 2;
-        int gapFromCenter = 58;
+        int gapFromCenter = 82;
 
         drawSingleHinge(g2, hingeX, centerY - gapFromCenter - hingeH, hingeW, hingeH);
         drawSingleHinge(g2, hingeX, centerY + gapFromCenter, hingeW, hingeH);
-}
+    }
 
     private void drawSingleHinge(Graphics2D g2, int x, int y, int w, int h) {
         g2.setColor(new Color(170, 124, 65));
@@ -170,9 +228,8 @@ public class BoardPanel extends JPanel {
             int screwY = y + 8 + i * ((h - 16 - screwSize) / 2);
             drawScrew(g2, leftScrewX, screwY, screwSize);
             drawScrew(g2, rightScrewX, screwY, screwSize);
+        }
     }
-}
-
 
     private void drawScrew(Graphics2D g2, int x, int y, int size) {
         g2.setColor(new Color(95, 68, 36));
@@ -181,7 +238,7 @@ public class BoardPanel extends JPanel {
         g2.setColor(new Color(45, 30, 18));
         g2.drawOval(x, y, size, size);
         g2.drawLine(x + 1, y + size / 2, x + size - 2, y + size / 2);
-}
+    }
 
     private void drawPoints(Graphics2D g2, int leftX, int rightX, int y, int h, int leftW, int rightW, int pointH) {
         int pointW = leftW / 6;
@@ -243,6 +300,85 @@ public class BoardPanel extends JPanel {
 
                 drawChecker(g2, checkerX, checkerY, checkerSize, point.owner);
             }
+        }
+    }
+
+    private void drawBarCheckers(Graphics2D g2, int barX, int y, int barWidth, int h) {
+        int checkerSize = Math.max(24, barWidth - 10);
+        int checkerX = barX + (barWidth - checkerSize) / 2;
+
+        if (player1.getBarCount() > 0) {
+            int stackTopY = y + h / 2 - checkerSize - 18;
+            drawCompressedStack(g2, checkerX, stackTopY, checkerSize, player1.getBarCount(), player1, true);
+        }
+
+        if (player2.getBarCount() > 0) {
+            int stackTopY = y + h / 2 + 18;
+            drawCompressedStack(g2, checkerX, stackTopY, checkerSize, player2.getBarCount(), player2, false);
+        }
+    }
+
+    private void drawBorneOffCheckers(Graphics2D g2, int rightPocketX, int y, int pocketW, int h) {
+        int checkerSize = Math.max(24, pocketW - 12);
+        int checkerX = rightPocketX + (pocketW - checkerSize) / 2;
+
+        int upperPocketY = y + h / 4 - checkerSize / 2;
+        int lowerPocketY = y + (3 * h) / 4 - checkerSize / 2;
+
+        drawBorneOffPocket(g2, checkerX, upperPocketY, checkerSize, player1.getBorneOff(), player1);
+        drawBorneOffPocket(g2, checkerX, lowerPocketY, checkerSize, player2.getBorneOff(), player2);
+    }
+
+    private void drawBorneOffPocket(Graphics2D g2, int x, int y, int checkerSize, int count, Player owner) {
+        if (count > 0) {
+            drawCompressedStack(g2, x, y, checkerSize, count, owner, false);
+        }
+    }
+
+    private void drawDiceArea(Graphics2D g2, int leftX, int y, int leftW, int h) {
+        int centerX = leftX + leftW / 2;
+        int centerY = y + h / 2;
+
+        diceView.draw(g2, centerX, centerY, leftDieValue, rightDieValue,
+                diceCanRoll, diceCanReverse, diceIsDouble, remainingMoveCount);
+    }
+
+    private void drawCompressedStack(Graphics2D g2, int x, int y, int checkerSize, int count, Player owner, boolean upward) {
+        if (count <= 0) {
+            return;
+        }
+
+        int visibleOffset = Math.max(6, checkerSize / 5);
+        int maxVisiblePieces = Math.min(count, 8);
+
+        for (int i = maxVisiblePieces - 1; i >= 0; i--) {
+            int checkerY;
+
+            if (upward) {
+                checkerY = y - (i * visibleOffset);
+            } else {
+                checkerY = y + (i * visibleOffset);
+            }
+
+            drawChecker(g2, x, checkerY, checkerSize, owner);
+        }
+
+        if (count > maxVisiblePieces) {
+            g2.setFont(new Font("Arial", Font.BOLD, 11));
+            g2.setColor(new Color(235, 220, 190));
+
+            String text = "x" + count;
+            FontMetrics metrics = g2.getFontMetrics();
+            int textX = x + checkerSize / 2 - metrics.stringWidth(text) / 2;
+            int textY;
+
+            if (upward) {
+                textY = y - (maxVisiblePieces * visibleOffset) - 4;
+            } else {
+                textY = y + checkerSize + (maxVisiblePieces * visibleOffset) + 12;
+            }
+
+            g2.drawString(text, textX, textY);
         }
     }
 

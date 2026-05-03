@@ -3,7 +3,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.ArrayList;
@@ -14,10 +13,8 @@ public class BackgammonGUI {
     private JFrame frame;
     private BoardPanel boardPanel;
     private JPanel movePanel;
-    private JTextArea infoArea;
     private JLabel turnLabel;
     private JLabel diceLabel;
-    private JButton rollButton;
     private JButton undoButton;
 
     private ArrayList<Integer> remainingDiceMoves;
@@ -28,7 +25,7 @@ public class BackgammonGUI {
     public BackgammonGUI() {
         game = new Game();
 
-        game.board.initialize(game.player1, game.player2);
+        game.board.initializeBearOffTest(game.player1, game.player2);
 
         frame = new JFrame("Backgammon Game");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -37,23 +34,21 @@ public class BackgammonGUI {
 
         JPanel topPanel = new JPanel(new GridLayout(1, 2));
         turnLabel = new JLabel("Current player: " + game.currentPlayer.getName());
-        diceLabel = new JLabel("Dice: -");
+        diceLabel = new JLabel("Click dice to roll");
         topPanel.add(turnLabel);
         topPanel.add(diceLabel);
         frame.add(topPanel, BorderLayout.NORTH);
 
         boardPanel = new BoardPanel(game.board, game.player1, game.player2);
+        boardPanel.setDiceClickAction(() -> startTurn());
+        boardPanel.setReverseClickAction(() -> switchDiceOrder());
         frame.add(boardPanel, BorderLayout.CENTER);
 
         JPanel rightPanel = new JPanel(new BorderLayout());
 
-        JPanel actionPanel = new JPanel(new GridLayout(2, 1));
+        JPanel actionPanel = new JPanel(new GridLayout(1, 1));
 
-        rollButton = new JButton("Roll Dice");
-        rollButton.addActionListener(e -> startTurn());
-        actionPanel.add(rollButton);
-
-        undoButton = new JButton("Undo Last Move");
+        undoButton = new JButton("↶");
         undoButton.setEnabled(false);
         undoButton.addActionListener(e -> undoLastMove());
         actionPanel.add(undoButton);
@@ -63,10 +58,6 @@ public class BackgammonGUI {
         movePanel = new JPanel(new GridLayout(0, 1));
         rightPanel.add(new JScrollPane(movePanel), BorderLayout.CENTER);
 
-        infoArea = new JTextArea(8, 24);
-        infoArea.setEditable(false);
-        rightPanel.add(new JScrollPane(infoArea), BorderLayout.SOUTH);
-
         frame.add(rightPanel, BorderLayout.EAST);
 
         remainingDiceMoves = new ArrayList<>();
@@ -75,7 +66,6 @@ public class BackgammonGUI {
         isDoubleTurn = false;
 
         updateBoardDisplay();
-        updateInfo("Game started. Click Roll Dice to begin.");
     }
 
     public void show() {
@@ -83,6 +73,10 @@ public class BackgammonGUI {
     }
 
     private void startTurn() {
+        if (!remainingDiceMoves.isEmpty()) {
+            return;
+        }
+
         if (game.isGameOver()) {
             showGameOverScreen();
             return;
@@ -101,12 +95,9 @@ public class BackgammonGUI {
         isDoubleTurn = game.dice.isDouble();
         canSwitchDiceOrder = !isDoubleTurn && remainingDiceMoves.size() == 2;
 
-        rollButton.setEnabled(false);
         diceLabel.setText("Dice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie());
 
-        updateInfo(game.currentPlayer.getName() + " rolled " +
-                game.dice.getFirstDie() + " - " + game.dice.getSecondDie());
-
+        updateBoardDisplay();
         showMovesForNextDice();
     }
 
@@ -128,17 +119,7 @@ public class BackgammonGUI {
         ArrayList<Move> validMoves =
                 game.moveValidator.getValidMovesForDice(game.board, game.currentPlayer, diceValue);
 
-        String extraInfo;
-
-        if (isDoubleTurn) {
-            extraInfo = "\nDouble moves remaining: " + remainingDiceMoves.size();
-        } else {
-            extraInfo = "";
-        }
-
-        updateInfo("Current player: " + game.currentPlayer.getName() +
-                "\nDice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie() +
-                "\nCurrent dice value: " + diceValue + extraInfo);
+        diceLabel.setText("Current dice: " + diceValue);
 
         if (validMoves.isEmpty()) {
             JButton skipButton = new JButton("No valid moves for " + diceValue + " - Skip");
@@ -173,23 +154,23 @@ public class BackgammonGUI {
             }
         }
 
-        if (canSwitchDiceOrder && remainingDiceMoves.size() == 2) {
-            JButton switchButton = new JButton("Switch dice order: use " + remainingDiceMoves.get(1) + " first instead");
-            switchButton.addActionListener(e -> switchDiceOrder());
-            movePanel.add(switchButton);
-        }
-
+        updateBoardDisplay();
         movePanel.revalidate();
         movePanel.repaint();
     }
 
     private void switchDiceOrder() {
+        if (!canSwitchDiceOrder || remainingDiceMoves.size() != 2) {
+            return;
+        }
+
         int firstDice = remainingDiceMoves.get(0);
         int secondDice = remainingDiceMoves.get(1);
 
         remainingDiceMoves.set(0, secondDice);
         remainingDiceMoves.set(1, firstDice);
 
+        updateBoardDisplay();
         showMovesForNextDice();
     }
 
@@ -199,6 +180,7 @@ public class BackgammonGUI {
         }
 
         canSwitchDiceOrder = false;
+        updateBoardDisplay();
         showMovesForNextDice();
     }
 
@@ -252,7 +234,6 @@ public class BackgammonGUI {
             winnerText = "Green";
         }
 
-        rollButton.setEnabled(false);
         undoButton.setEnabled(false);
         diceLabel.setText("Game Over");
 
@@ -267,22 +248,21 @@ public class BackgammonGUI {
         movePanel.revalidate();
         movePanel.repaint();
 
-        updateInfo("Game Over\nWinner: " + winnerText);
+        updateBoardDisplay();
     }
 
     private void restartGame() {
         game = new Game();
 
-        game.board.initialize(game.player1, game.player2);
+        game.board.initializeBearOffTest(game.player1, game.player2);
 
         remainingDiceMoves = new ArrayList<>();
         undoStack.clear();
         canSwitchDiceOrder = false;
         isDoubleTurn = false;
 
-        rollButton.setEnabled(true);
         undoButton.setEnabled(false);
-        diceLabel.setText("Dice: -");
+        diceLabel.setText("Click dice to roll");
         turnLabel.setText("Current player: " + game.currentPlayer.getName());
 
         movePanel.removeAll();
@@ -290,7 +270,6 @@ public class BackgammonGUI {
         movePanel.repaint();
 
         updateBoardDisplay();
-        updateInfo("Game restarted. Click Roll Dice to begin.");
     }
 
     private void endTurn() {
@@ -302,38 +281,42 @@ public class BackgammonGUI {
         canSwitchDiceOrder = false;
         isDoubleTurn = false;
 
-        rollButton.setEnabled(true);
         movePanel.removeAll();
         movePanel.revalidate();
         movePanel.repaint();
 
         turnLabel.setText("Current player: " + game.currentPlayer.getName());
-        diceLabel.setText("Dice: -");
-        updateInfo("Turn ended. " + game.currentPlayer.getName() + " should roll dice.");
+        diceLabel.setText("Click dice to roll");
+        updateBoardDisplay();
     }
 
     private void updateBoardDisplay() {
         boardPanel.setGameData(game.board, game.player1, game.player2);
+
+        int leftDie = 0;
+        int rightDie = 0;
+        boolean canRoll = remainingDiceMoves.isEmpty() && !game.isGameOver();
+        boolean canReverse = canSwitchDiceOrder && remainingDiceMoves.size() == 2 && !isDoubleTurn;
+        int remainingCount = 0;
+
+        if (!canRoll && !remainingDiceMoves.isEmpty()) {
+            leftDie = remainingDiceMoves.get(0);
+
+            if (isDoubleTurn) {
+                rightDie = leftDie;
+                remainingCount = remainingDiceMoves.size();
+            } else if (remainingDiceMoves.size() > 1) {
+                rightDie = remainingDiceMoves.get(1);
+            }
+        }
+
+        boardPanel.setDiceData(leftDie, rightDie, canRoll, canReverse, isDoubleTurn, remainingCount);
         boardPanel.repaint();
 
         turnLabel.setText("Current player: " + game.currentPlayer.getName());
-        if (game.dice.getFirstDie() != 0 && game.dice.getSecondDie() != 0) {
-            diceLabel.setText("Dice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie());
-        }
     }
 
     private int toDisplayPoint(int internalIndex) {
         return internalIndex + 1;
-    }
-
-    private void updateInfo(String message) {
-        infoArea.setText(message + "\n\n" +
-                "Dice: " + game.dice.getFirstDie() + " - " + game.dice.getSecondDie() + "\n" +
-                "Player 1: Brown checkers\n" +
-                "Player 2: Green checkers\n\n" +
-                game.player1.getName() + " bar: " + game.player1.getBarCount() +
-                " | borne off: " + game.player1.getBorneOff() + "\n" +
-                game.player2.getName() + " bar: " + game.player2.getBarCount() +
-                " | borne off: " + game.player2.getBorneOff());
     }
 }
