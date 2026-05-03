@@ -45,4 +45,12 @@ public class Player {
     public int getBorneOff() {
         return borneOff;
     }
+
+    public void setBarCount(int barCount) {
+        this.barCount = barCount;
+    }
+
+    public void setBorneOff(int borneOff) {
+        this.borneOff = borneOff;
+    }
 }

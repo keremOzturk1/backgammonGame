@@ -47,7 +47,7 @@ public class Game {
             printValidMoves(validMoves);
 
             Move selectedMove = askPlayerToChooseMove(validMoves);
-            board.movePiece(selectedMove.getFrom(), selectedMove.getTo(), currentPlayer);
+            board.applyMove(selectedMove);
 
             String selectedFromText;
 
@@ -57,7 +57,12 @@ public class Game {
                 selectedFromText = String.valueOf(selectedMove.getFrom() + 1);
             }
 
-            System.out.println("Move played: From " + selectedFromText + " to " + (selectedMove.getTo() + 1));
+            if (selectedMove.isBearOff()) {
+                System.out.println("Move played: Bear off from " + selectedFromText);
+            } else {
+                System.out.println("Move played: From " + selectedFromText + " to " + (selectedMove.getTo() + 1));
+            }
+
             board.printBoard();
         }
 
@@ -77,8 +82,12 @@ public class Game {
                 fromText = String.valueOf(move.getFrom() + 1);
             }
 
-            System.out.println((i + 1) + ") From " + fromText + " to " + (move.getTo() + 1) +
-                    (move.isHit() ? " (hit)" : ""));
+            if (move.isBearOff()) {
+                System.out.println((i + 1) + ") Bear off from " + fromText);
+            } else {
+                System.out.println((i + 1) + ") From " + fromText + " to " + (move.getTo() + 1) +
+                        (move.isHit() ? " (hit)" : ""));
+            }
         }
     }
 

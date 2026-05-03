@@ -8,19 +8,17 @@ public class MoveValidator {
         int to = move.getTo();
         Player player = move.getPlayer();
 
-        // Check destination bounds
-        if (to < 0 || to >= 24) {
-            return false;
-        }
-
-        Point destination = board.getPoint(to);
-
         // If player has pieces on the bar, only bar entry moves are allowed
         if (player.hasPiecesOnBar()) {
             if (from != -1) {
                 return false;
             }
 
+            if (to < 0 || to >= 24) {
+                return false;
+            }
+
+            Point destination = board.getPoint(to);
             int expectedEntryPoint;
 
             if (player.getDirection() == 1) {
@@ -36,7 +34,7 @@ public class MoveValidator {
             return !destination.isBlockedFor(player);
         }
 
-        // Normal moves must start from a valid board point
+        // Normal and bear-off moves must start from a valid board point
         if (from < 0 || from >= 24) {
             return false;
         }
@@ -48,14 +46,24 @@ public class MoveValidator {
             return false;
         }
 
-        // Destination point cannot be blocked by opponent
-        if (destination.isBlockedFor(player)) {
+        int expectedTo = from + (diceValue * player.getDirection());
+        if (to != expectedTo) {
             return false;
         }
 
-        // Move distance must match dice value
-        int expectedTo = from + (diceValue * player.getDirection());
-        if (to != expectedTo) {
+        if (isBearOffTarget(player, to)) {
+            return isValidBearOff(board, player, from, to);
+        }
+
+        // Normal move destination must stay on the board
+        if (to < 0 || to >= 24) {
+            return false;
+        }
+
+        Point destination = board.getPoint(to);
+
+        // Destination point cannot be blocked by opponent
+        if (destination.isBlockedFor(player)) {
             return false;
         }
 
@@ -92,14 +100,19 @@ public class MoveValidator {
 
         for (int from = 0; from < 24; from++) {
             int to = from + (diceValue * player.getDirection());
-
             Move move = new Move(from, to, player);
 
-            if (isValidMove(board, move, diceValue)) {
-                Point destination = board.getPoint(to);
+            if (isBearOffTarget(player, to)) {
+                move.isBearOff = true;
+            }
 
-                if (destination.canBeHitBy(player)) {
-                    move.isHit = true;
+            if (isValidMove(board, move, diceValue)) {
+                if (!move.isBearOff()) {
+                    Point destination = board.getPoint(to);
+
+                    if (destination.canBeHitBy(player)) {
+                        move.isHit = true;
+                    }
                 }
 
                 validMoves.add(move);
@@ -120,5 +133,79 @@ public class MoveValidator {
         }
 
         return allMoves;
+    }
+
+    private boolean isBearOffTarget(Player player, int to) {
+        if (player.getDirection() == 1) {
+            return to >= 24;
+        }
+
+        return to < 0;
+    }
+
+    private boolean isValidBearOff(Board board, Player player, int from, int to) {
+        if (!allPiecesInHomeBoard(board, player)) {
+            return false;
+        }
+
+        if (player.getDirection() == 1) {
+            if (to == 24) {
+                return true;
+            }
+
+            return !hasPlayerPieceBehind(board, player, from);
+        }
+
+        if (to == -1) {
+            return true;
+        }
+
+        return !hasPlayerPieceBehind(board, player, from);
+    }
+
+    private boolean allPiecesInHomeBoard(Board board, Player player) {
+        if (player.hasPiecesOnBar()) {
+            return false;
+        }
+
+        for (int i = 0; i < 24; i++) {
+            Point point = board.getPoint(i);
+
+            if (point.isOwnedBy(player) && !isHomeBoardIndex(player, i)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isHomeBoardIndex(Player player, int index) {
+        if (player.getDirection() == 1) {
+            return index >= 18 && index <= 23;
+        }
+
+        return index >= 0 && index <= 5;
+    }
+
+    private boolean hasPlayerPieceBehind(Board board, Player player, int from) {
+        if (player.getDirection() == 1) {
+            for (int i = 18; i < from; i++) {
+                Point point = board.getPoint(i);
+
+                if (point.isOwnedBy(player)) {
+                    return true;
+                }
+            }
+        } else {
+            for (int i = from + 1; i <= 5; i++) {
+                Point point = board.getPoint(i);
+
+                if (point.isOwnedBy(player)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

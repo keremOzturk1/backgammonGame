@@ -45,8 +45,69 @@ public class Board {
         points[5].owner = player2;
     }
 
+    // Temporary setup for testing borne off rules
+    public void initializeBearOffTest(Player player1, Player player2) {
+        // Clear board
+        for (int i = 0; i < 24; i++) {
+            points[i].count = 0;
+            points[i].owner = null;
+        }
+
+        // Player 1 home board: points 19-24
+        points[18].count = 2;
+        points[18].owner = player1;
+
+        points[19].count = 2;
+        points[19].owner = player1;
+
+        points[20].count = 3;
+        points[20].owner = player1;
+
+        points[21].count = 3;
+        points[21].owner = player1;
+
+        points[22].count = 2;
+        points[22].owner = player1;
+
+        points[23].count = 3;
+        points[23].owner = player1;
+
+        // Player 2 home board: points 1-6
+        points[0].count = 3;
+        points[0].owner = player2;
+
+        points[1].count = 2;
+        points[1].owner = player2;
+
+        points[2].count = 3;
+        points[2].owner = player2;
+
+        points[3].count = 2;
+        points[3].owner = player2;
+
+        points[4].count = 2;
+        points[4].owner = player2;
+
+        points[5].count = 3;
+        points[5].owner = player2;
+    }
+
     public Point getPoint(int index) {
         return points[index];
+    }
+
+    public void applyMove(Move move) {
+        if (move.isBearOff()) {
+            bearOffPiece(move.getFrom(), move.getPlayer());
+        } else {
+            movePiece(move.getFrom(), move.getTo(), move.getPlayer());
+        }
+    }
+
+    private void bearOffPiece(int from, Player player) {
+        Point source = points[from];
+        source.removePiece();
+        player.bearOff();
     }
 
     public void movePiece(int from, int to, Player player) {
