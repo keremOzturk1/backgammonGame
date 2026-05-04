@@ -1,6 +1,7 @@
 import javax.swing.JPanel;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -10,6 +11,9 @@ import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.util.ArrayList;
+import java.util.function.IntConsumer;
 
 public class BoardPanel extends JPanel {
 
@@ -20,12 +24,22 @@ public class BoardPanel extends JPanel {
     private DiceView diceView;
     private Runnable diceClickAction;
     private Runnable reverseClickAction;
+    private Runnable undoClickAction;
+    private IntConsumer pointClickAction;
+
     private int leftDieValue;
     private int rightDieValue;
     private int remainingMoveCount;
     private boolean diceCanRoll;
     private boolean diceCanReverse;
     private boolean diceIsDouble;
+    private boolean undoAvailable;
+
+    private ArrayList<Integer> highlightedPoints;
+    private ArrayList<Integer> targetPoints;
+    private ArrayList<Integer> hitTargetPoints;
+    private int selectedPoint;
+    private boolean selectedPointCanBearOff;
 
     private final Color woodDark = new Color(92, 50, 30);
     private final Color woodMid = new Color(135, 79, 45);
@@ -48,14 +62,29 @@ public class BoardPanel extends JPanel {
         diceCanRoll = true;
         diceCanReverse = false;
         diceIsDouble = false;
+        undoAvailable = false;
+
         leftDieValue = 0;
         rightDieValue = 0;
         remainingMoveCount = 0;
+
+        highlightedPoints = new ArrayList<>();
+        targetPoints = new ArrayList<>();
+        hitTargetPoints = new ArrayList<>();
+        selectedPoint = -1;
+        selectedPointCanBearOff = false;
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 handleMouseClick(e.getX(), e.getY());
+            }
+        });
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                updateCursor(e.getX(), e.getY());
             }
         });
     }
@@ -86,7 +115,52 @@ public class BoardPanel extends JPanel {
         this.reverseClickAction = reverseClickAction;
     }
 
+    public void setUndoClickAction(Runnable undoClickAction) {
+        this.undoClickAction = undoClickAction;
+    }
+
+    public void setPointClickAction(IntConsumer pointClickAction) {
+        this.pointClickAction = pointClickAction;
+    }
+
+    public void setUndoAvailable(boolean undoAvailable) {
+        this.undoAvailable = undoAvailable;
+        repaint();
+    }
+
+    public void setHighlightedPoints(ArrayList<Integer> highlightedPoints) {
+        this.highlightedPoints = highlightedPoints;
+        repaint();
+    }
+
+    public void setTargetPoints(ArrayList<Integer> targetPoints) {
+        this.targetPoints = targetPoints;
+        repaint();
+    }
+
+    public void setHitTargetPoints(ArrayList<Integer> hitTargetPoints) {
+        this.hitTargetPoints = hitTargetPoints;
+        repaint();
+    }
+
+    public void setSelectedPoint(int selectedPoint) {
+        this.selectedPoint = selectedPoint;
+        repaint();
+    }
+
+    public void setSelectedPointCanBearOff(boolean selectedPointCanBearOff) {
+        this.selectedPointCanBearOff = selectedPointCanBearOff;
+        repaint();
+    }
+
     private void handleMouseClick(int x, int y) {
+        if (undoAvailable && diceView.isUndoClicked(x, y)) {
+            if (undoClickAction != null) {
+                undoClickAction.run();
+            }
+            return;
+        }
+
         if (diceCanReverse && diceView.isReverseClicked(x, y)) {
             if (reverseClickAction != null) {
                 reverseClickAction.run();
@@ -98,7 +172,136 @@ public class BoardPanel extends JPanel {
             if (diceClickAction != null) {
                 diceClickAction.run();
             }
+            return;
         }
+
+        if (highlightedPoints.contains(-1) && isBarAreaAt(x, y)) {
+            if (pointClickAction != null) {
+                pointClickAction.accept(-1);
+            }
+            return;
+        }
+
+        int clickedPoint = getPointIndexAt(x, y);
+        if (clickedPoint != -1 && pointClickAction != null) {
+            pointClickAction.accept(clickedPoint);
+        }
+    }
+
+    private void updateCursor(int x, int y) {
+        boolean clickable = false;
+
+        if (undoAvailable && diceView.isUndoClicked(x, y)) {
+            clickable = true;
+        }
+
+        if (diceCanReverse && diceView.isReverseClicked(x, y)) {
+            clickable = true;
+        }
+
+        if (diceCanRoll && diceView.isDiceAreaClicked(x, y)) {
+            clickable = true;
+        }
+
+        int hoveredPoint = getPointIndexAt(x, y);
+        if (hoveredPoint != -1 && highlightedPoints.contains(hoveredPoint)) {
+            clickable = true;
+        }
+
+        if (hoveredPoint != -1 && targetPoints.contains(hoveredPoint)) {
+            clickable = true;
+        }
+
+        if (highlightedPoints.contains(-1) && isBarAreaAt(x, y)) {
+            clickable = true;
+        }
+
+        if (clickable) {
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        } else {
+            setCursor(Cursor.getDefaultCursor());
+        }
+    }
+
+    private int getPointIndexAt(int mouseX, int mouseY) {
+        int width = getWidth();
+        int height = getHeight();
+
+        int outerMargin = 22;
+        int frameThickness = 34;
+        int barWidth = 42;
+        int pocketWidth = 42;
+
+        int boardX = outerMargin;
+        int boardY = outerMargin;
+        int boardW = width - (2 * outerMargin);
+        int boardH = height - (2 * outerMargin);
+
+        int innerX = boardX + frameThickness + pocketWidth;
+        int innerY = boardY + frameThickness;
+        int innerW = boardW - (2 * frameThickness) - (2 * pocketWidth);
+        int innerH = boardH - (2 * frameThickness);
+
+        int leftHalfW = (innerW - barWidth) / 2;
+        int rightHalfW = leftHalfW;
+        int leftX = innerX;
+        int barX = innerX + leftHalfW;
+        int rightX = barX + barWidth;
+        int pointW = leftHalfW / 6;
+
+        if (mouseY < innerY || mouseY > innerY + innerH) {
+            return -1;
+        }
+
+        boolean topRow = mouseY < innerY + innerH / 2;
+
+        if (mouseX >= leftX && mouseX < leftX + leftHalfW) {
+            int column = (mouseX - leftX) / pointW;
+
+            if (topRow) {
+                return 12 + column;
+            }
+
+            return 11 - column;
+        }
+
+        if (mouseX >= rightX && mouseX < rightX + rightHalfW) {
+            int column = (mouseX - rightX) / pointW;
+
+            if (topRow) {
+                return 18 + column;
+            }
+
+            return 5 - column;
+        }
+
+        return -1;
+    }
+
+    private boolean isBarAreaAt(int mouseX, int mouseY) {
+        int width = getWidth();
+        int height = getHeight();
+
+        int outerMargin = 22;
+        int frameThickness = 34;
+        int barWidth = 42;
+        int pocketWidth = 42;
+
+        int boardX = outerMargin;
+        int boardY = outerMargin;
+        int boardW = width - (2 * outerMargin);
+        int boardH = height - (2 * outerMargin);
+
+        int innerX = boardX + frameThickness + pocketWidth;
+        int innerY = boardY + frameThickness;
+        int innerW = boardW - (2 * frameThickness) - (2 * pocketWidth);
+        int innerH = boardH - (2 * frameThickness);
+
+        int leftHalfW = (innerW - barWidth) / 2;
+        int barX = innerX + leftHalfW;
+
+        return mouseX >= barX && mouseX <= barX + barWidth
+                && mouseY >= innerY && mouseY <= innerY + innerH;
     }
 
     @Override
@@ -145,6 +348,7 @@ public class BoardPanel extends JPanel {
 
         int pointHeight = innerH / 2 - 16;
         drawPoints(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW, pointHeight);
+        drawTargetHighlights(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW);
         drawCheckers(g2, leftX, rightX, innerY, innerH, leftHalfW, rightHalfW);
         drawBarCheckers(g2, barX, innerY, barWidth, innerH);
         drawBorneOffCheckers(g2, boardX + boardW - frameThickness - pocketWidth, innerY, pocketWidth, innerH);
@@ -273,6 +477,45 @@ public class BoardPanel extends JPanel {
         g2.fillPolygon(triangle);
     }
 
+    private void drawTargetHighlights(Graphics2D g2, int leftX, int rightX, int y, int h, int leftW, int rightW) {
+        int pointW = leftW / 6;
+        int markerSize = Math.max(22, pointW / 3);
+
+        for (int i = 0; i < targetPoints.size(); i++) {
+            int pointIndex = targetPoints.get(i);
+            int displayPoint = pointIndex + 1;
+            int[] center = getPointCenter(displayPoint, leftX, rightX, y, h, leftW, rightW);
+            boolean topRow = displayPoint >= 13;
+            boolean hitTarget = hitTargetPoints.contains(pointIndex);
+
+            int markerX = center[0] - markerSize / 2;
+            int markerY;
+
+            if (topRow) {
+                markerY = y + h / 2 - markerSize - 18;
+            } else {
+                markerY = y + h / 2 + 18;
+            }
+
+            if (hitTarget) {
+                g2.setColor(new Color(220, 50, 45, 105));
+            } else {
+                g2.setColor(new Color(255, 220, 95, 95));
+            }
+
+            g2.fillOval(markerX, markerY, markerSize, markerSize);
+
+            if (hitTarget) {
+                g2.setColor(new Color(245, 85, 75));
+            } else {
+                g2.setColor(new Color(255, 230, 120));
+            }
+
+            g2.setStroke(new BasicStroke(3));
+            g2.drawOval(markerX, markerY, markerSize, markerSize);
+        }
+    }
+
     private void drawCheckers(Graphics2D g2, int leftX, int rightX, int y, int h, int leftW, int rightW) {
         for (int pointIndex = 0; pointIndex < 24; pointIndex++) {
             Point point = board.getPoint(pointIndex);
@@ -285,7 +528,18 @@ public class BoardPanel extends JPanel {
             int[] center = getPointCenter(displayPoint, leftX, rightX, y, h, leftW, rightW);
 
             int checkerSize = Math.min(leftW / 6, h / 12) - 8;
-            int stackGap = Math.max(8, checkerSize - 6);
+            int maxStackHeight = h / 2 - 18;
+            int stackGap;
+
+            if (point.count <= 1) {
+                stackGap = 0;
+            } else if (point.count <= 5) {
+                stackGap = Math.max(8, checkerSize - 6);
+            } else {
+                stackGap = (maxStackHeight - checkerSize) / (point.count - 1);
+                stackGap = Math.max(7, Math.min(stackGap, checkerSize - 6));
+            }
+
             boolean topRow = displayPoint >= 13;
 
             for (int i = 0; i < point.count; i++) {
@@ -296,6 +550,18 @@ public class BoardPanel extends JPanel {
                     checkerY = y + (i * stackGap);
                 } else {
                     checkerY = y + h - checkerSize - (i * stackGap);
+                }
+
+                if (highlightedPoints.contains(pointIndex) && i == point.count - 1) {
+                    drawCheckerHighlight(g2, checkerX, checkerY, checkerSize);
+                }
+
+                if (selectedPoint == pointIndex && i == point.count - 1) {
+                    drawSelectedCheckerHighlight(g2, checkerX, checkerY, checkerSize);
+
+                    if (selectedPointCanBearOff) {
+                        drawBearOffCheckerHighlight(g2, checkerX, checkerY, checkerSize);
+                    }
                 }
 
                 drawChecker(g2, checkerX, checkerY, checkerSize, point.owner);
@@ -309,11 +575,21 @@ public class BoardPanel extends JPanel {
 
         if (player1.getBarCount() > 0) {
             int stackTopY = y + h / 2 - checkerSize - 18;
+
+            if (highlightedPoints.contains(-1)) {
+                drawCheckerHighlight(g2, checkerX, stackTopY, checkerSize);
+            }
+
             drawCompressedStack(g2, checkerX, stackTopY, checkerSize, player1.getBarCount(), player1, true);
         }
 
         if (player2.getBarCount() > 0) {
             int stackTopY = y + h / 2 + 18;
+
+            if (highlightedPoints.contains(-1)) {
+                drawCheckerHighlight(g2, checkerX, stackTopY, checkerSize);
+            }
+
             drawCompressedStack(g2, checkerX, stackTopY, checkerSize, player2.getBarCount(), player2, false);
         }
     }
@@ -340,7 +616,7 @@ public class BoardPanel extends JPanel {
         int centerY = y + h / 2;
 
         diceView.draw(g2, centerX, centerY, leftDieValue, rightDieValue,
-                diceCanRoll, diceCanReverse, diceIsDouble, remainingMoveCount);
+                diceCanRoll, diceCanReverse, diceIsDouble, remainingMoveCount, undoAvailable);
     }
 
     private void drawCompressedStack(Graphics2D g2, int x, int y, int checkerSize, int count, Player owner, boolean upward) {
@@ -414,6 +690,33 @@ public class BoardPanel extends JPanel {
 
         g2.setColor(checkerHighlight);
         g2.fillOval(x + size / 5, y + size / 6, size / 3, size / 4);
+    }
+
+    private void drawCheckerHighlight(Graphics2D g2, int x, int y, int size) {
+        g2.setColor(new Color(255, 220, 95, 95));
+        g2.fillOval(x - 5, y - 5, size + 10, size + 10);
+
+        g2.setColor(new Color(255, 230, 120));
+        g2.setStroke(new BasicStroke(3));
+        g2.drawOval(x - 5, y - 5, size + 10, size + 10);
+    }
+
+    private void drawSelectedCheckerHighlight(Graphics2D g2, int x, int y, int size) {
+        g2.setColor(new Color(90, 170, 255, 105));
+        g2.fillOval(x - 7, y - 7, size + 14, size + 14);
+
+        g2.setColor(new Color(120, 200, 255));
+        g2.setStroke(new BasicStroke(4));
+        g2.drawOval(x - 7, y - 7, size + 14, size + 14);
+    }
+
+    private void drawBearOffCheckerHighlight(Graphics2D g2, int x, int y, int size) {
+        g2.setColor(new Color(70, 200, 95, 115));
+        g2.fillOval(x - 10, y - 10, size + 20, size + 20);
+
+        g2.setColor(new Color(95, 235, 120));
+        g2.setStroke(new BasicStroke(4));
+        g2.drawOval(x - 10, y - 10, size + 20, size + 20);
     }
 
     private void drawPointNumbers(Graphics2D g2, int leftX, int rightX, int y, int h, int leftW, int rightW) {

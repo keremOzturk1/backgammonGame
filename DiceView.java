@@ -10,6 +10,7 @@ public class DiceView {
 
     private Rectangle diceArea;
     private Rectangle reverseArea;
+    private Rectangle undoArea;
 
     private final Color dieFace = new Color(245, 237, 216);
     private final Color dieBorder = new Color(70, 45, 30);
@@ -22,10 +23,12 @@ public class DiceView {
     public DiceView() {
         diceArea = new Rectangle();
         reverseArea = new Rectangle();
+        undoArea = new Rectangle();
     }
 
     public void draw(Graphics2D g2, int centerX, int centerY, int leftValue, int rightValue,
-                     boolean canRoll, boolean canReverse, boolean isDouble, int remainingMoves) {
+                     boolean canRoll, boolean canReverse, boolean isDouble, int remainingMoves,
+                     boolean canUndo) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         int dieSize = 48;
@@ -34,8 +37,9 @@ public class DiceView {
         int startX = centerX - totalW / 2;
         int diceY = centerY - dieSize / 2;
 
-        diceArea.setBounds(startX - 18, diceY - 20, totalW + 36, dieSize + 58);
+        diceArea.setBounds(startX - 12, diceY - 12, totalW + 24, dieSize + 24);
         reverseArea.setBounds(centerX - 13, diceY + dieSize / 2 - 13, 26, 26);
+        undoArea.setBounds(centerX - 16, diceY + dieSize + 36, 32, 32);
 
         if (canRoll) {
             drawGlow(g2, diceArea.x, diceArea.y, diceArea.width, diceArea.height);
@@ -45,15 +49,20 @@ public class DiceView {
         drawDie(g2, startX + dieSize + gap, diceY, dieSize, rightValue, false);
 
         if (canRoll) {
-            drawRollText(g2, centerX, diceY + dieSize + 28);
+            drawRollText(g2, centerX, centerY);
         }
 
         if (canReverse) {
             drawReverseButton(g2);
         }
 
+        if (canUndo) {
+            drawUndoButton(g2);
+        }
+
         if (isDouble && remainingMoves > 0 && !canRoll) {
-            drawRemainingMoves(g2, centerX, diceY + dieSize + 28, remainingMoves);
+            int noteY = canUndo ? diceY + dieSize + 84 : diceY + dieSize + 28;
+            drawRemainingMoves(g2, centerX, noteY, remainingMoves);
         }
     }
 
@@ -65,13 +74,17 @@ public class DiceView {
         return reverseArea.contains(x, y);
     }
 
+    public boolean isUndoClicked(int x, int y) {
+        return undoArea.contains(x, y);
+    }
+
     private void drawGlow(Graphics2D g2, int x, int y, int w, int h) {
         g2.setColor(glowColor);
-        g2.fillRoundRect(x, y, w, h, 24, 24);
+        g2.fillRoundRect(x, y, w, h, 18, 18);
 
         g2.setColor(new Color(255, 230, 150, 140));
         g2.setStroke(new BasicStroke(3));
-        g2.drawRoundRect(x, y, w, h, 24, 24);
+        g2.drawRoundRect(x, y, w, h, 18, 18);
     }
 
     private void drawDie(Graphics2D g2, int x, int y, int size, int value, boolean isCurrent) {
@@ -127,12 +140,14 @@ public class DiceView {
         g2.fillOval(centerX - size / 2, centerY - size / 2, size, size);
     }
 
-    private void drawRollText(Graphics2D g2, int centerX, int y) {
-        g2.setFont(new Font("Arial", Font.BOLD, 13));
+    private void drawRollText(Graphics2D g2, int centerX, int centerY) {
+        g2.setFont(new Font("Arial", Font.BOLD, 14));
         g2.setColor(new Color(75, 45, 28));
         String text = "ROLL";
         FontMetrics metrics = g2.getFontMetrics();
-        g2.drawString(text, centerX - metrics.stringWidth(text) / 2, y);
+        int textX = centerX - metrics.stringWidth(text) / 2;
+        int textY = centerY + metrics.getAscent() / 2 - 3;
+        g2.drawString(text, textX, textY);
     }
 
     private void drawReverseButton(Graphics2D g2) {
@@ -149,6 +164,23 @@ public class DiceView {
         FontMetrics metrics = g2.getFontMetrics();
         int textX = reverseArea.x + reverseArea.width / 2 - metrics.stringWidth(text) / 2;
         int textY = reverseArea.y + reverseArea.height / 2 + metrics.getAscent() / 2 - 3;
+        g2.drawString(text, textX, textY);
+    }
+
+    private void drawUndoButton(Graphics2D g2) {
+        g2.setColor(new Color(120, 75, 45));
+        g2.fillOval(undoArea.x, undoArea.y, undoArea.width, undoArea.height);
+
+        g2.setColor(new Color(55, 35, 24));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawOval(undoArea.x, undoArea.y, undoArea.width, undoArea.height);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        g2.setColor(new Color(245, 230, 205));
+        String text = "↶";
+        FontMetrics metrics = g2.getFontMetrics();
+        int textX = undoArea.x + undoArea.width / 2 - metrics.stringWidth(text) / 2;
+        int textY = undoArea.y + undoArea.height / 2 + metrics.getAscent() / 2 - 4;
         g2.drawString(text, textX, textY);
     }
 

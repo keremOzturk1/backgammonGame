@@ -9,6 +9,7 @@ public class GameState {
     private int player2BarCount;
     private int player1BorneOff;
     private int player2BorneOff;
+    private int currentPlayerOwner; // 1 = player1, 2 = player2
 
     private ArrayList<Integer> remainingDiceMoves;
     private boolean canSwitchDiceOrder;
@@ -20,6 +21,7 @@ public class GameState {
         remainingDiceMoves = new ArrayList<>();
         canSwitchDiceOrder = false;
         isDoubleTurn = false;
+        currentPlayerOwner = 1;
     }
 
     public GameState(Game game, ArrayList<Integer> remainingDiceMoves,
@@ -44,6 +46,12 @@ public class GameState {
         player2BarCount = game.player2.getBarCount();
         player1BorneOff = game.player1.getBorneOff();
         player2BorneOff = game.player2.getBorneOff();
+
+        if (game.currentPlayer == game.player1) {
+            currentPlayerOwner = 1;
+        } else {
+            currentPlayerOwner = 2;
+        }
 
         this.remainingDiceMoves = new ArrayList<>();
         for (int i = 0; i < remainingDiceMoves.size(); i++) {
@@ -72,6 +80,12 @@ public class GameState {
         game.player2.setBarCount(player2BarCount);
         game.player1.setBorneOff(player1BorneOff);
         game.player2.setBorneOff(player2BorneOff);
+
+        if (currentPlayerOwner == 1) {
+            game.currentPlayer = game.player1;
+        } else {
+            game.currentPlayer = game.player2;
+        }
     }
 
     public ArrayList<Integer> getRemainingDiceMovesCopy() {
